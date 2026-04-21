@@ -78,7 +78,9 @@ echo ""
 echo "▶ [3/6] Python venv + зависимости..."
 
 cd "${API}"
+sudo chown -R deploy:deploy .
 python3 -m venv venv
+sudo chown -R deploy:deploy venv
 venv/bin/pip install --upgrade pip --quiet
 venv/bin/pip install -r requirements.txt --quiet
 venv/bin/python3 -c "import fastapi, fitz, pytesseract, aiosqlite; print('  ✓ все импорты OK')"
