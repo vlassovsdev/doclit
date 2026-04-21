@@ -18,4 +18,6 @@ jobs:
           script: |
             cd /var/www/html/doclit.vlasovs.tk
             git pull origin main
+            echo 'pulled'
             bash deploy.sh
+            echo 'deployed'
