@@ -9,19 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Copy files via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "./*,!api_backend/venv,!api_backend/doclit.db,!api_backend/uploads,!api_backend/outputs"
-          target: "/var/www/html/doclit.vlasovs.tk"
-
-      - name: Run deployment script via SSH
+      - name: Run deployment via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -29,4 +17,5 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /var/www/html/doclit.vlasovs.tk
-            bash deploy-dnf.sh
+            git pull origin main
+            bash deploy.sh
