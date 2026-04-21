@@ -43,27 +43,30 @@ echo "  ✓ пакеты установлены"
 echo ""
 echo "▶ [2/6] Раскладываем файлы..."
 
-mkdir -p "${API}/app/api"
-mkdir -p "${API}/app/workers"
-mkdir -p "${API}/uploads"
-mkdir -p "${API}/outputs"
+sudo chown -R deploy:deploy "${ROOT}"
+
+sudo mkdir -p "${API}/app/api"
+sudo mkdir -p "${API}/app/workers"
+sudo mkdir -p "${API}/uploads"
+sudo mkdir -p "${API}/outputs"
 
 # requirements.txt — лежит рядом со скриптом
-cp "${ROOT}/requirements.txt"             "${API}/requirements.txt"
+sudo cp "${ROOT}/requirements.txt"             "${API}/requirements.txt"
 
 # Python модули из папки app/
-cp "${ROOT}/app/main.py"                  "${API}/app/main.py"
-cp "${ROOT}/app/database.py"              "${API}/app/database.py"
-touch "${API}/app/__init__.py"
+sudo cp "${ROOT}/app/main.py"                  "${API}/app/main.py"
+sudo cp "${ROOT}/app/database.py"              "${API}/app/database.py"
+sudo touch "${API}/app/__init__.py"
 
-cp "${ROOT}/app/api/auth.py"              "${API}/app/api/auth.py"
-cp "${ROOT}/app/api/files.py"             "${API}/app/api/files.py"
-cp "${ROOT}/app/api/jobs.py"              "${API}/app/api/jobs.py"
-touch "${API}/app/api/__init__.py"
+sudo cp "${ROOT}/app/api/auth.py"              "${API}/app/api/auth.py"
+sudo cp "${ROOT}/app/api/files.py"             "${API}/app/api/files.py"
+sudo cp "${ROOT}/app/api/jobs.py"              "${API}/app/api/jobs.py"
+sudo touch "${API}/app/api/__init__.py"
 
-cp "${ROOT}/app/workers/processor.py"     "${API}/app/workers/processor.py"
-touch "${API}/app/workers/__init__.py"
+sudo cp "${ROOT}/app/workers/processor.py"     "${API}/app/workers/processor.py"
+sudo touch "${API}/app/workers/__init__.py"
 
+sudo chown -R deploy:deploy "${API}"
 echo "  ✓ файлы скопированы в ${API}"
 find "${API}/app" -name "*.py" | sort
 
@@ -112,6 +115,7 @@ UNIT
 
 sudo chown -R deploy:deploy "${ROOT}"
 sudo chown -R deploy:deploy "${API}"
+sudo chown -R www-data:www-data "${API}/uploads" "${API}/outputs" 2>/dev/null || true
 
 sudo systemctl daemon-reload
 sudo systemctl enable doclit-api
