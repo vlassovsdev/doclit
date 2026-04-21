@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocLit — doclit.vlasovs.tk</title>
+<meta name="description" content="Конвертация, OCR и редактирование PDF, DOC, PNG — быстро и без лишнего.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0b;
+  --bg2: #111114;
+  --bg3: #18181d;
+  --line: rgba(255,255,255,0.07);
+  --line2: rgba(255,255,255,0.13);
+  --text: #f0ede8;
+  --muted: #6b6870;
+  --muted2: #9895a0;
+  --accent: #d4f73c;
+  --accent2: #a8f220;
+  --accent-dim: rgba(212,247,60,0.12);
+  --accent-dim2: rgba(212,247,60,0.06);
+  --coral: #ff6b47;
+  --blue: #4fa3f7;
+  --r: 10px;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ── NOISE TEXTURE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.4;
+}
+
+/* ── TYPOGRAPHY ── */
+h1,h2,h3,h4 { font-family: 'Syne', sans-serif; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+.mono { font-family: 'DM Mono', monospace; }
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 48px;
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(20px);
+  background: rgba(10,10,11,0.7);
+}
+.nav-logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: -0.04em;
+  color: var(--text);
+  text-decoration: none;
+  display: flex; align-items: center; gap: 8px;
+}
+.nav-logo-dot {
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.8); }
+}
+.nav-links { display: flex; align-items: center; gap: 32px; }
+.nav-links a {
+  color: var(--muted2); text-decoration: none; font-size: 14px;
+  font-family: 'DM Mono', monospace; font-weight: 400;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-cta {
+  background: var(--accent); color: #0a0a0b;
+  padding: 10px 22px; border-radius: 6px;
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 13px; text-decoration: none;
+  transition: background 0.2s, transform 0.15s;
+  letter-spacing: 0.02em;
+}
+.nav-cta:hover { background: var(--accent2); transform: translateY(-1px); }
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 140px 48px 100px;
+  position: relative; overflow: hidden;
+}
+
+/* Grid background */
+.hero::after {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Glowing orb */
+.hero-orb {
+  position: absolute; top: -200px; right: -100px;
+  width: 700px; height: 700px;
+  background: radial-gradient(circle, rgba(212,247,60,0.08) 0%, transparent 65%);
+  pointer-events: none;
+}
+.hero-orb2 {
+  position: absolute; bottom: -100px; left: -200px;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(79,163,247,0.06) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line2);
+  background: var(--bg2);
+  padding: 6px 14px 6px 8px;
+  border-radius: 100px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px; color: var(--muted2);
+  margin-bottom: 40px;
+  width: fit-content;
+  animation: fadeUp 0.6s ease both;
+}
+.hero-badge-dot {
+  width: 6px; height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+.hero-badge span { color: var(--accent); }
+
+.hero h1 {
+  font-size: clamp(52px, 8vw, 110px);
+  line-height: 0.95;
+  color: var(--text);
+  animation: fadeUp 0.6s ease 0.1s both;
+  max-width: 900px;
+}
+.hero h1 em {
+  font-style: normal;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(240,237,232,0.25);
+}
+.hero h1 .accent-word {
+  position: relative; color: var(--accent);
+}
+
+.hero-sub {
+  margin-top: 32px;
+  font-size: 18px; color: var(--muted2);
+  max-width: 520px; line-height: 1.7;
+  animation: fadeUp 0.6s ease 0.2s both;
+}
+
+.hero-actions {
+  display: flex; align-items: center; gap: 16px;
+  margin-top: 48px;
+  animation: fadeUp 0.6s ease 0.3s both;
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--accent); color: #0a0a0b;
+  padding: 16px 32px; border-radius: 8px;
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px;
+  text-decoration: none; letter-spacing: 0.01em;
+  transition: all 0.2s; position: relative; overflow: hidden;
+}
+.btn-primary::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,0.15);
+  transform: translateX(-100%);
+  transition: transform 0.3s;
+}
+.btn-primary:hover::before { transform: translateX(0); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(212,247,60,0.3); }
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: var(--muted2); font-size: 14px;
+  font-family: 'DM Mono', monospace;
+  text-decoration: none; padding: 16px 8px;
+  transition: color 0.2s;
+}
+.btn-secondary:hover { color: var(--text); }
+.btn-arrow { transition: transform 0.2s; }
+.btn-secondary:hover .btn-arrow { transform: translateX(4px); }
+
+/* File types strip */
+.hero-filetypes {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-top: 64px;
+  animation: fadeUp 0.6s ease 0.4s both;
+}
+.filetype-tag {
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  padding: 5px 12px; border-radius: 4px;
+  border: 1px solid var(--line2);
+  color: var(--muted);
+}
+.filetype-tag.active {
+  border-color: rgba(212,247,60,0.3);
+  color: var(--accent);
+  background: var(--accent-dim2);
+}
+
+/* ── FEATURES ── */
+.section { padding: 120px 48px; }
+.section-label {
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase;
+  margin-bottom: 16px; display: flex; align-items: center; gap: 12px;
+}
+.section-label::before {
+  content: ''; width: 24px; height: 1px; background: var(--accent);
+}
+.section-title {
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1.0; margin-bottom: 80px;
+  max-width: 640px;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.feature-card {
+  background: var(--bg);
+  padding: 40px 36px;
+  position: relative;
+  transition: background 0.3s;
+}
+.feature-card:hover { background: var(--bg2); }
+.feature-card::after {
+  content: '';
+  position: absolute; bottom: 0; left: 36px; right: 36px;
+  height: 1px; background: transparent;
+  transition: background 0.3s;
+}
+.feature-card:hover::after { background: var(--accent-dim); }
+
+.feature-num {
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  color: var(--muted); letter-spacing: 0.1em;
+  margin-bottom: 28px;
+}
+.feature-icon {
+  width: 44px; height: 44px;
+  background: var(--bg3);
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 24px;
+  font-size: 20px;
+  transition: border-color 0.3s, background 0.3s;
+}
+.feature-card:hover .feature-icon {
+  border-color: rgba(212,247,60,0.3);
+  background: var(--accent-dim2);
+}
+.feature-card h3 {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 20px; letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+.feature-card p { font-size: 14px; color: var(--muted2); line-height: 1.65; }
+
+/* ── HOW IT WORKS ── */
+.how-section { padding: 120px 48px; background: var(--bg2); }
+.steps { display: flex; flex-direction: column; gap: 0; max-width: 800px; }
+.step {
+  display: grid; grid-template-columns: 72px 1fr;
+  gap: 0 32px; position: relative;
+  padding-bottom: 48px;
+}
+.step:last-child { padding-bottom: 0; }
+.step-num-wrap { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.step-num {
+  width: 44px; height: 44px;
+  border: 1px solid var(--line2);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500;
+  color: var(--muted2); flex-shrink: 0;
+  transition: border-color 0.3s, color 0.3s;
+  background: var(--bg2);
+}
+.step:hover .step-num {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.step-line {
+  width: 1px; flex: 1;
+  background: linear-gradient(var(--line2), transparent);
+  margin-top: 12px;
+}
+.step:last-child .step-line { display: none; }
+.step-content { padding-top: 10px; padding-bottom: 40px; }
+.step-content h3 {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 22px; letter-spacing: -0.02em; margin-bottom: 10px;
+}
+.step-content p { font-size: 15px; color: var(--muted2); max-width: 500px; }
+.step-tag {
+  display: inline-block; margin-top: 14px;
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  color: var(--accent); background: var(--accent-dim);
+  padding: 3px 10px; border-radius: 4px;
+  border: 1px solid rgba(212,247,60,0.2);
+}
+
+/* ── FORMATS ── */
+.formats-section { padding: 120px 48px; }
+.formats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+.format-card {
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: 12px; padding: 36px;
+  transition: border-color 0.3s;
+}
+.format-card:hover { border-color: var(--line2); }
+.format-card-head {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 24px;
+}
+.format-badge {
+  font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500;
+  padding: 6px 14px; border-radius: 6px;
+  background: var(--bg3); border: 1px solid var(--line2);
+  color: var(--text);
+}
+.format-badge.pdf { color: var(--coral); border-color: rgba(255,107,71,0.25); background: rgba(255,107,71,0.08); }
+.format-badge.doc { color: var(--blue); border-color: rgba(79,163,247,0.25); background: rgba(79,163,247,0.08); }
+.format-badge.png { color: var(--accent); border-color: rgba(212,247,60,0.25); background: var(--accent-dim2); }
+.format-card h3 {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 18px; letter-spacing: -0.02em;
+}
+.format-ops { display: flex; flex-wrap: wrap; gap: 8px; }
+.format-op {
+  font-size: 13px; color: var(--muted2);
+  padding: 4px 10px; border: 1px solid var(--line);
+  border-radius: 4px; font-family: 'DM Mono', monospace;
+}
+
+/* ── PRICING ── */
+.pricing-section { padding: 120px 48px; background: var(--bg2); }
+.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.plan {
+  background: var(--bg2); padding: 44px 36px;
+  display: flex; flex-direction: column;
+  transition: background 0.3s;
+}
+.plan.featured { background: var(--bg3); position: relative; }
+.plan-recommended {
+  position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #0a0a0b;
+  font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+  padding: 4px 14px; border-radius: 0 0 8px 8px;
+  letter-spacing: 0.05em; white-space: nowrap;
+}
+.plan-name {
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.plan-price {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 52px; letter-spacing: -0.04em;
+  line-height: 1; margin-bottom: 6px;
+}
+.plan-price sup { font-size: 22px; vertical-align: top; margin-top: 10px; font-weight: 600; }
+.plan-period { font-size: 13px; color: var(--muted); margin-bottom: 32px; font-family: 'DM Mono', monospace; }
+.plan-divider { height: 1px; background: var(--line); margin-bottom: 28px; }
+.plan-features { list-style: none; display: flex; flex-direction: column; gap: 12px; flex: 1; margin-bottom: 32px; }
+.plan-features li {
+  font-size: 14px; color: var(--muted2);
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.plan-features li::before {
+  content: '✓'; color: var(--accent);
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  margin-top: 2px; flex-shrink: 0;
+}
+.plan-features li.muted::before { color: var(--muted); content: '—'; }
+.plan-features li.muted { color: var(--muted); }
+.plan-btn {
+  display: block; text-align: center;
+  padding: 14px; border-radius: 7px;
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px;
+  text-decoration: none; transition: all 0.2s; cursor: pointer;
+  border: 1px solid var(--line2); color: var(--muted2);
+  background: transparent;
+}
+.plan-btn:hover { border-color: var(--line2); background: var(--bg3); color: var(--text); }
+.plan-btn.accent {
+  background: var(--accent); color: #0a0a0b;
+  border-color: transparent;
+}
+.plan-btn.accent:hover { background: var(--accent2); transform: translateY(-1px); }
+
+/* ── FAQ ── */
+.faq-section { padding: 120px 48px; }
+.faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; max-width: 960px; }
+.faq-item { background: var(--bg); padding: 32px 36px; transition: background 0.2s; }
+.faq-item:hover { background: var(--bg2); }
+.faq-item h4 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: -0.01em; margin-bottom: 10px; }
+.faq-item p { font-size: 14px; color: var(--muted2); line-height: 1.65; }
+
+/* ── CTA SECTION ── */
+.cta-section {
+  padding: 120px 48px;
+  background: var(--bg2);
+  text-align: center;
+  position: relative; overflow: hidden;
+}
+.cta-section::before {
+  content: '';
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 800px; height: 400px;
+  background: radial-gradient(ellipse, rgba(212,247,60,0.07) 0%, transparent 60%);
+  pointer-events: none;
+}
+.cta-section h2 {
+  font-size: clamp(40px, 6vw, 80px);
+  margin-bottom: 20px;
+  position: relative;
+}
+.cta-section p { font-size: 17px; color: var(--muted2); margin-bottom: 48px; }
+.cta-actions { display: flex; align-items: center; justify-content: center; gap: 16px; }
+
+/* ── FOOTER ── */
+footer {
+  padding: 48px;
+  border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.footer-logo {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 18px; letter-spacing: -0.04em; color: var(--text);
+}
+.footer-copy { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+.footer-links { display: flex; gap: 24px; }
+.footer-links a { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); text-decoration: none; transition: color 0.2s; }
+.footer-links a:hover { color: var(--text); }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.reveal {
+  opacity: 0; transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ── UPLOAD DEMO ── */
+.upload-demo {
+  margin-top: 80px;
+  border: 1px dashed rgba(212,247,60,0.25);
+  border-radius: 12px;
+  padding: 40px;
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+  gap: 12px;
+  background: var(--accent-dim2);
+  cursor: pointer;
+  transition: border-color 0.3s, background 0.3s;
+  animation: fadeUp 0.6s ease 0.5s both;
+  max-width: 560px;
+}
+.upload-demo:hover {
+  border-color: rgba(212,247,60,0.5);
+  background: rgba(212,247,60,0.08);
+}
+.upload-demo-icon { font-size: 32px; line-height: 1; }
+.upload-demo-text { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; }
+.upload-demo-sub { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+
+/* ── STATS ── */
+.stats-strip {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(4,1fr);
+  background: var(--bg2);
+}
+.stat {
+  padding: 40px 36px;
+  border-right: 1px solid var(--line);
+}
+.stat:last-child { border-right: none; }
+.stat-val {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 44px; letter-spacing: -0.04em;
+  color: var(--accent); line-height: 1; margin-bottom: 6px;
+}
+.stat-label { font-size: 13px; color: var(--muted2); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  nav { padding: 16px 24px; }
+  .nav-links { display: none; }
+  .hero, .section, .how-section, .formats-section, .pricing-section, .faq-section, .cta-section, footer { padding-left: 24px; padding-right: 24px; }
+  .features-grid { grid-template-columns: 1fr; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .formats-grid { grid-template-columns: 1fr; }
+  .faq-grid { grid-template-columns: 1fr; }
+  .stats-strip { grid-template-columns: 1fr 1fr; }
+  .stat { border-right: none; border-bottom: 1px solid var(--line); }
+  footer { flex-direction: column; gap: 16px; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <span class="nav-logo-dot"></span>
+    DocLit
+  </a>
+  <div class="nav-links">
+    <a href="#features">Функции</a>
+    <a href="#how">Как работает</a>
+    <a href="#pricing">Цены</a>
+    <a href="#faq">FAQ</a>
+    <a href="/app" class="nav-cta">Начать бесплатно →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-orb"></div>
+  <div class="hero-orb2"></div>
+
+  <div class="hero-badge">
+    <span class="hero-badge-dot"></span>
+    <span>Beta · Запущено в 2025</span>
+    &nbsp;—&nbsp;OCR + конвертация + AI редактор
+  </div>
+
+  <h1>
+    Документы,<br>
+    которые <span class="accent-word">работают</span><br>
+    <em>на вас</em>
+  </h1>
+
+  <p class="hero-sub">
+    Конвертируйте, распознавайте текст и редактируйте PDF, DOCX и PNG — прямо в браузере. Без установки. Без отправки файлов на сторонние серверы.
+  </p>
+
+  <div class="hero-actions">
+    <a href="/app" class="btn-primary">
+      Попробовать бесплатно
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="#0a0a0b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <a href="#how" class="btn-secondary">
+      Как это работает <span class="btn-arrow">→</span>
+    </a>
+  </div>
+
+  <div class="hero-filetypes">
+    <span class="filetype-tag active">PDF</span>
+    <span class="filetype-tag active">DOCX</span>
+    <span class="filetype-tag active">PNG</span>
+    <span class="filetype-tag">JPG</span>
+    <span class="filetype-tag">DOC</span>
+    <span class="filetype-tag">TXT</span>
+    <span class="filetype-tag" style="opacity:0.5">XLS — скоро</span>
+  </div>
+
+  <div class="upload-demo" onclick="window.location.href='/app'">
+    <div class="upload-demo-icon">📄</div>
+    <div class="upload-demo-text">Перетащите файл сюда</div>
+    <div class="upload-demo-sub">PDF, DOCX, PNG до 30 МБ · Бесплатно без регистрации</div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-strip reveal">
+  <div class="stat"><div class="stat-val">99%</div><div class="stat-label">Точность OCR на печатном тексте</div></div>
+  <div class="stat"><div class="stat-val">&lt;5с</div><div class="stat-label">Среднее время конвертации</div></div>
+  <div class="stat"><div class="stat-val">0</div><div class="stat-label">Файлов хранится на наших серверах</div></div>
+  <div class="stat"><div class="stat-val">6+</div><div class="stat-label">Поддерживаемых форматов</div></div>
+</div>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="section-label">Возможности</div>
+  <h2 class="section-title reveal">Всё что нужно для работы с документами</h2>
+
+  <div class="features-grid reveal">
+    <div class="feature-card">
+      <div class="feature-num">01</div>
+      <div class="feature-icon">🔄</div>
+      <h3>Конвертация</h3>
+      <p>PDF в DOCX, DOCX в PDF, любой документ в PNG. LibreOffice под капотом — точная конвертация с сохранением форматирования.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">02</div>
+      <div class="feature-icon">🔍</div>
+      <h3>OCR распознавание</h3>
+      <p>Tesseract 5 с поддержкой русского, казахского и 100+ языков. Распознаёт сканы, фото документов и рукописный текст.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">03</div>
+      <div class="feature-icon">✂️</div>
+      <h3>Редактирование PDF</h3>
+      <p>Удаление страниц, поворот, объединение нескольких PDF в один. Без потери качества, без перекодирования.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">04</div>
+      <div class="feature-icon">✏️</div>
+      <h3>WYSIWYG редактор</h3>
+      <p>Редактируйте текст прямо на странице PDF, как в Word. Меняйте шрифты, добавляйте блоки, вставляйте изображения.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">05</div>
+      <div class="feature-icon">🤖</div>
+      <h3>AI улучшение</h3>
+      <p>Повышение качества сканов, удаление шума, выравнивание перекошенных страниц. Claude AI для умного редактирования текста.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">06</div>
+      <div class="feature-icon">🔒</div>
+      <h3>Ваши данные — ваши</h3>
+      <p>Все операции выполняются на изолированном сервере. Файлы удаляются сразу после обработки. Никакого машинного обучения на ваших данных.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-section" id="how">
+  <div class="section-label">Как работает</div>
+  <h2 class="section-title reveal">Три шага до результата</h2>
+
+  <div class="steps reveal">
+    <div class="step">
+      <div class="step-num-wrap">
+        <div class="step-num">01</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <h3>Загрузите файл</h3>
+        <p>Перетащите PDF, DOCX или PNG в браузер или выберите через проводник. Поддержка файлов до 30 МБ на бесплатном плане.</p>
+        <span class="step-tag">drag & drop · paste · file picker</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num-wrap">
+        <div class="step-num">02</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <h3>Выберите операцию</h3>
+        <p>Конвертировать, распознать текст, удалить страницы или открыть в редакторе. Можно комбинировать несколько действий.</p>
+        <span class="step-tag">convert · ocr · edit · enhance</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num-wrap">
+        <div class="step-num">03</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <h3>Скачайте результат</h3>
+        <p>Обработка занимает от 2 до 30 секунд. Готовый файл доступен сразу для скачивания. Ссылка живёт 24 часа.</p>
+        <span class="step-tag">instant download · 24h link</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FORMATS -->
+<section class="formats-section reveal" id="formats">
+  <div class="section-label">Форматы</div>
+  <h2 class="section-title reveal">Что умеет DocLit</h2>
+
+  <div class="formats-grid reveal">
+    <div class="format-card">
+      <div class="format-card-head">
+        <span class="format-badge pdf">PDF</span>
+        <h3>Работа с PDF</h3>
+      </div>
+      <div class="format-ops">
+        <span class="format-op">→ DOCX</span>
+        <span class="format-op">→ PNG/JPG</span>
+        <span class="format-op">→ TXT (OCR)</span>
+        <span class="format-op">удалить страницы</span>
+        <span class="format-op">объединить PDF</span>
+        <span class="format-op">повернуть</span>
+        <span class="format-op">сжать</span>
+        <span class="format-op">защитить паролем</span>
+      </div>
+    </div>
+    <div class="format-card">
+      <div class="format-card-head">
+        <span class="format-badge doc">DOCX / DOC</span>
+        <h3>Word документы</h3>
+      </div>
+      <div class="format-ops">
+        <span class="format-op">→ PDF</span>
+        <span class="format-op">→ PNG</span>
+        <span class="format-op">→ TXT</span>
+        <span class="format-op">проверка орфографии (AI)</span>
+        <span class="format-op">форматирование</span>
+      </div>
+    </div>
+    <div class="format-card">
+      <div class="format-card-head">
+        <span class="format-badge png">PNG / JPG</span>
+        <h3>Изображения</h3>
+      </div>
+      <div class="format-ops">
+        <span class="format-op">→ PDF</span>
+        <span class="format-op">→ DOCX</span>
+        <span class="format-op">→ TXT (OCR)</span>
+        <span class="format-op">улучшение качества (AI)</span>
+        <span class="format-op">выравнивание скана</span>
+      </div>
+    </div>
+    <div class="format-card" style="border-style: dashed; opacity: 0.6;">
+      <div class="format-card-head">
+        <span class="format-badge">XLS / XLSX</span>
+        <h3>Скоро</h3>
+      </div>
+      <div class="format-ops">
+        <span class="format-op">→ PDF</span>
+        <span class="format-op">→ CSV</span>
+        <span class="format-op">AI анализ данных</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing-section" id="pricing">
+  <div class="section-label">Тарифы</div>
+  <h2 class="section-title reveal">Начните бесплатно</h2>
+
+  <div class="pricing-grid reveal">
+    <div class="plan">
+      <div class="plan-name">Free</div>
+      <div class="plan-price">0<sup>₸</sup></div>
+      <div class="plan-period">навсегда бесплатно</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        <li>5 файлов в день</li>
+        <li>До 10 МБ на файл</li>
+        <li>Конвертация форматов</li>
+        <li>OCR распознавание</li>
+        <li>Удаление страниц</li>
+        <li class="muted">WYSIWYG редактор</li>
+        <li class="muted">AI улучшение</li>
+        <li class="muted">API доступ</li>
+      </ul>
+      <a href="/app" class="plan-btn">Начать бесплатно</a>
+    </div>
+
+    <div class="plan featured">
+      <div class="plan-recommended">ПОПУЛЯРНЫЙ</div>
+      <div class="plan-name">Pro</div>
+      <div class="plan-price"><sup>$</sup>9</div>
+      <div class="plan-period">в месяц · отмена в любой момент</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        <li>100 файлов в день</li>
+        <li>До 50 МБ на файл</li>
+        <li>Конвертация форматов</li>
+        <li>OCR с таблицами</li>
+        <li>Все операции с PDF</li>
+        <li>WYSIWYG редактор</li>
+        <li>AI улучшение качества</li>
+        <li class="muted">API доступ</li>
+      </ul>
+      <a href="/app" class="plan-btn accent">Подключить Pro</a>
+    </div>
+
+    <div class="plan">
+      <div class="plan-name">Business</div>
+      <div class="plan-price"><sup>$</sup>29</div>
+      <div class="plan-period">в месяц · до 5 пользователей</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        <li>Без ограничений на файлы</li>
+        <li>До 200 МБ на файл</li>
+        <li>Все функции Pro</li>
+        <li>AI редактирование (Claude)</li>
+        <li>REST API доступ</li>
+        <li>Приоритетная обработка</li>
+        <li>Выделенная поддержка</li>
+        <li>SLA 99.5%</li>
+      </ul>
+      <a href="mailto:hi@doclit.vlasovs.tk" class="plan-btn">Написать нам</a>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="faq-section" id="faq">
+  <div class="section-label">FAQ</div>
+  <h2 class="section-title reveal">Частые вопросы</h2>
+
+  <div class="faq-grid reveal">
+    <div class="faq-item">
+      <h4>Мои файлы в безопасности?</h4>
+      <p>Да. Файлы обрабатываются на изолированном сервере и удаляются сразу после загрузки результата. Мы не храним и не анализируем содержимое ваших документов.</p>
+    </div>
+    <div class="faq-item">
+      <h4>Какие языки поддерживает OCR?</h4>
+      <p>Tesseract 5 поддерживает 100+ языков включая русский, казахский, английский, немецкий, арабский. Многоязычные документы распознаются автоматически.</p>
+    </div>
+    <div class="faq-item">
+      <h4>Нужна ли регистрация?</h4>
+      <p>Нет — первые 3 конвертации в день доступны без регистрации. Для 5 файлов/день на бесплатном тарифе нужен только email.</p>
+    </div>
+    <div class="faq-item">
+      <h4>Есть ли API для интеграции?</h4>
+      <p>Да, REST API доступен на тарифе Business. Документация с примерами на Python, JS, curl. Webhook-нотификации о готовности файлов.</p>
+    </div>
+    <div class="faq-item">
+      <h4>Как работает AI улучшение?</h4>
+      <p>Для изображений — апскейл через Real-ESRGAN, удаление шума, коррекция перекоса. Для текста — Claude AI для рерайта, суммаризации, перевода.</p>
+    </div>
+    <div class="faq-item">
+      <h4>Можно ли развернуть у себя?</h4>
+      <p>Self-hosted версия в планах. Напишите нам — для enterprise клиентов готовы обсудить on-premise деплой с вашей инфраструктурой.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2 class="reveal">Начните работать<br>с документами умнее</h2>
+  <p class="reveal">Первые 3 конвертации бесплатно и без регистрации</p>
+  <div class="cta-actions reveal">
+    <a href="#" class="btn-primary">
+      Попробовать сейчас
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="#0a0a0b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">DocLit</div>
+  <div class="footer-copy">© 2025 DocLit. Documents Literate.</div>
+  <div class="footer-links">
+    <a href="#">Политика</a>
+    <a href="#">Условия</a>
+    <a href="#">API</a>
+    <a href="mailto:hi@doclit.app">Контакт</a>
+  </div>
+</footer>
+
+<script>
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Stagger children
+document.querySelectorAll('.features-grid, .pricing-grid, .faq-grid').forEach(grid => {
+  [...grid.children].forEach((child, i) => {
+    child.style.transitionDelay = (i * 0.07) + 's';
+    child.classList.add('reveal');
+    observer.observe(child);
+  });
+});
+
+// Upload drag visual
+const uploadDemo = document.querySelector('.upload-demo');
+if (uploadDemo) {
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadDemo.style.borderColor = 'var(--accent)';
+    uploadDemo.style.background = 'rgba(212,247,60,0.12)';
+    uploadDemo.querySelector('.upload-demo-text').textContent = 'Файл получен — MVP скоро!';
+  });
+}
+</script>
+</body>
+</html>
