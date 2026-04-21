@@ -76,11 +76,9 @@ echo "▶ [3/6] Python venv + зависимости..."
 
 cd "${API}"
 python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip --quiet
-pip install -r requirements.txt --quiet
-python3 -c "import fastapi, fitz, pytesseract, aiosqlite; print('  ✓ все импорты OK')"
-deactivate
+venv/bin/pip install --upgrade pip --quiet
+venv/bin/pip install -r requirements.txt --quiet
+venv/bin/python3 -c "import fastapi, fitz, pytesseract, aiosqlite; print('  ✓ все импорты OK')"
 cd "${ROOT}"
 
 
@@ -92,13 +90,13 @@ echo "▶ [4/6] Systemd сервис..."
 
 JWT_SECRET=$(openssl rand -hex 32)
 
-sudo cat > /etc/systemd/system/doclit-api.service << UNIT
+cat << UNIT | sudo tee /etc/systemd/system/doclit-api.service > /dev/null
 [Unit]
 Description=DocLit FastAPI — ${DOMAIN}
 After=network.target
 
 [Service]
-User=www-data
+User=deploy
 WorkingDirectory=${API}
 Environment="JWT_SECRET=${JWT_SECRET}"
 Environment="DB_PATH=${API}/doclit.db"
@@ -172,7 +170,7 @@ if [ -z "$SSL_CERT" ]; then
     exit 1
 fi
 
-sudo cat > "${NGINX_CONF}" << NGINX
+cat << NGINX | sudo tee "${NGINX_CONF}" > /dev/null
 server {
     listen 80;
     server_name ${DOMAIN} www.${DOMAIN};
