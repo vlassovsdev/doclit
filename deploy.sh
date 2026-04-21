@@ -27,10 +27,8 @@ echo ""
 # 1. Системные пакеты
 # ─────────────────────────────────────────
 echo "▶ [1/6] Системные пакеты..."
-sudo su
-whoami
-apt-get update -qq
-apt-get install -y -qq \
+sudo apt-get update -qq
+sudo apt-get install -y -qq \
     python3 python3-pip python3-venv python3-dev \
     libreoffice-writer libreoffice-calc \
     tesseract-ocr tesseract-ocr-rus tesseract-ocr-kaz \
@@ -79,7 +77,6 @@ echo "▶ [3/6] Python venv + зависимости..."
 cd "${API}"
 python3 -m venv venv
 source venv/bin/activate
-export PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 pip install --upgrade pip --quiet
 pip install -r requirements.txt --quiet
 python3 -c "import fastapi, fitz, pytesseract, aiosqlite; print('  ✓ все импорты OK')"
@@ -95,7 +92,7 @@ echo "▶ [4/6] Systemd сервис..."
 
 JWT_SECRET=$(openssl rand -hex 32)
 
-cat > /etc/systemd/system/doclit-api.service << UNIT
+sudo cat > /etc/systemd/system/doclit-api.service << UNIT
 [Unit]
 Description=DocLit FastAPI — ${DOMAIN}
 After=network.target
@@ -115,20 +112,20 @@ StandardError=journal
 WantedBy=multi-user.target
 UNIT
 
-chown -R www-data:www-data "${ROOT}"
-chown -R www-data:www-data "${API}"
+sudo chown -R deploy:deploy "${ROOT}"
+sudo chown -R deploy:deploy "${API}"
 
-systemctl daemon-reload
-systemctl enable doclit-api
-systemctl restart doclit-api
+sudo systemctl daemon-reload
+sudo systemctl enable doclit-api
+sudo systemctl restart doclit-api
 
 sleep 3
-if systemctl is-active --quiet doclit-api; then
+if sudo systemctl is-active --quiet doclit-api; then
     echo "  ✓ API запущен"
     curl -s http://127.0.0.1:8000/api/health && echo ""
 else
     echo "  ✗ API не запустился. Логи:"
-    journalctl -u doclit-api -n 30 --no-pager
+    sudo journalctl -u doclit-api -n 30 --no-pager
     exit 1
 fi
 
@@ -158,24 +155,24 @@ if [ -z "$NGINX_CONF" ]; then
     exit 1
 fi
 
-cp "${NGINX_CONF}" "${NGINX_CONF}.bak.$(date +%s)"
+sudo cp "${NGINX_CONF}" "${NGINX_CONF}.bak.$(date +%s)"
 echo "  Бэкап сохранён"
 
-SSL_CERT=$(grep -m1 'ssl_certificate '     "${NGINX_CONF}" | awk '{print $2}' | tr -d ';"')
-SSL_KEY=$( grep -m1 'ssl_certificate_key'  "${NGINX_CONF}" | awk '{print $2}' | tr -d ';"')
-SSL_OPTS=$(grep -m1 'include.*options-ssl' "${NGINX_CONF}" | awk '{print $2}' | tr -d ';"')
-SSL_DH=$(  grep -m1 'ssl_dhparam'          "${NGINX_CONF}" | awk '{print $2}' | tr -d ';"')
+SSL_CERT=$(sudo grep -m1 'ssl_certificate '     "${NGINX_CONF}" | awk '{print $2}' | tr -d ';"')
+SSL_KEY=$(sudo grep -m1 'ssl_certificate_key'  "${NGINX_CONF}" | awk '{print $2}' | tr -d ';"')
+SSL_OPTS=$(sudo grep -m1 'include.*options-ssl' "${NGINX_CONF}" | awk '{print $2}' | tr -d ';"')
+SSL_DH=$(sudo grep -m1 'ssl_dhparam'          "${NGINX_CONF}" | awk '{print $2}' | tr -d ';"')
 
 echo "  SSL cert: ${SSL_CERT}"
 echo "  SSL key:  ${SSL_KEY}"
 
 if [ -z "$SSL_CERT" ]; then
     echo "  ✗ SSL не найден в конфиге. Содержимое:"
-    cat "${NGINX_CONF}"
+    sudo cat "${NGINX_CONF}"
     exit 1
 fi
 
-cat > "${NGINX_CONF}" << NGINX
+sudo cat > "${NGINX_CONF}" << NGINX
 server {
     listen 80;
     server_name ${DOMAIN} www.${DOMAIN};
@@ -227,7 +224,7 @@ server {
 }
 NGINX
 
-nginx -t && systemctl reload nginx && echo "  ✓ Nginx перезагружен"
+sudo nginx -t && sudo systemctl reload nginx && echo "  ✓ Nginx перезагружен"
 
 
 # ─────────────────────────────────────────
@@ -235,9 +232,9 @@ nginx -t && systemctl reload nginx && echo "  ✓ Nginx перезагружен
 # ─────────────────────────────────────────
 echo ""
 echo "▶ [6/6] Cron..."
-(crontab -l 2>/dev/null | grep -v doclit; \
+(sudo crontab -l 2>/dev/null | grep -v doclit; \
  echo "0 3 * * * find ${API}/uploads -mtime +1 -delete 2>/dev/null; find ${API}/outputs -mtime +1 -delete 2>/dev/null  # doclit") \
- | crontab -
+ | sudo crontab -
 echo "  ✓ автоочистка в 3:00"
 
 
