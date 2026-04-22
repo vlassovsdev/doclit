@@ -96,6 +96,14 @@ echo "▶ [4/6] Systemd сервис..."
 
 JWT_SECRET=$(openssl rand -hex 32)
 
+# Load Google credentials from .env
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+if [ -f "${ROOT}/.env" ]; then
+  source <(grep -E '^GOOGLE_' "${ROOT}/.env")
+  echo "  .env загружен"
+fi
+
 cat << UNIT | sudo tee /etc/systemd/system/doclit-api.service > /dev/null
 [Unit]
 Description=DocLit FastAPI — ${DOMAIN}
@@ -106,6 +114,8 @@ User=deploy
 WorkingDirectory=${API}
 Environment="JWT_SECRET=${JWT_SECRET}"
 Environment="DB_PATH=${API}/doclit.db"
+Environment="GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}"
+Environment="GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}"
 ExecStart=${API}/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=on-failure
 RestartSec=5
@@ -207,9 +217,7 @@ server {
     }
 
     location /outputs/ {
-        proxy_pass       http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        expires 24h;
+        return 403;
     }
 
     location = /app {
@@ -238,9 +246,9 @@ sudo nginx -t && sudo systemctl reload nginx && echo "  ✓ Nginx перезаг
 echo ""
 echo "▶ [6/6] Cron..."
 (sudo crontab -l 2>/dev/null | grep -v doclit; \
- echo "0 3 * * * find ${API}/uploads -mtime +1 -delete 2>/dev/null; find ${API}/outputs -mtime +1 -delete 2>/dev/null  # doclit") \
+ echo "0 3 * * * cd ${API} && venv/bin/python -m app.workers.cleanup 2>/dev/null  # doclit") \
  | sudo crontab -
-echo "  ✓ автоочистка в 3:00"
+echo "  ✓ очистка в 3:00 (анонимные 7 дней, зарег. 90 дней)"
 
 
 echo ""

@@ -20,7 +20,9 @@ async def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             email       TEXT    UNIQUE NOT NULL,
-            password    TEXT    NOT NULL,
+            password    TEXT,
+            google_id   TEXT    UNIQUE,
+            avatar_url  TEXT,
             plan        TEXT    NOT NULL DEFAULT 'free',
             jobs_today  INTEGER NOT NULL DEFAULT 0,
             last_reset  TEXT    NOT NULL DEFAULT (date('now')),
@@ -28,19 +30,60 @@ async def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS jobs (
-            id          TEXT    PRIMARY KEY,
-            user_id     INTEGER,
-            operation   TEXT    NOT NULL,
-            status      TEXT    NOT NULL DEFAULT 'pending',
-            input_file  TEXT    NOT NULL,
-            output_file TEXT,
-            error       TEXT,
-            created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-            updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+            id              TEXT    PRIMARY KEY,
+            user_id         INTEGER,
+            anon_ip         TEXT,
+            download_token  TEXT    UNIQUE,
+            expires_at      TEXT,
+            operation       TEXT    NOT NULL,
+            status          TEXT    NOT NULL DEFAULT 'pending',
+            input_file      TEXT    NOT NULL,
+            output_file     TEXT,
+            error           TEXT,
+            created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at      TEXT    NOT NULL DEFAULT (datetime('now')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
 
-        CREATE INDEX IF NOT EXISTS idx_jobs_user   ON jobs(user_id);
-        CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+        CREATE INDEX IF NOT EXISTS idx_jobs_user    ON jobs(user_id);
+        CREATE INDEX IF NOT EXISTS idx_jobs_status  ON jobs(status);
+        CREATE INDEX IF NOT EXISTS idx_jobs_token   ON jobs(download_token);
+        CREATE INDEX IF NOT EXISTS idx_jobs_expires ON jobs(expires_at);
         """)
+        await db.commit()
+
+    # Run migrations for existing databases
+    await _migrate(DB_PATH)
+
+
+async def _migrate(db_path: str):
+    """Add new columns to existing tables if they don't exist."""
+    async with aiosqlite.connect(db_path) as db:
+        # Check existing columns in users table
+        async with db.execute("PRAGMA table_info(users)") as cur:
+            user_cols = {row[1] async for row in cur}
+
+        for col, typedef in [
+            ("google_id",  "TEXT"),
+            ("avatar_url", "TEXT"),
+        ]:
+            if col not in user_cols:
+                await db.execute(f"ALTER TABLE users ADD COLUMN {col} {typedef}")
+
+        # Check existing columns in jobs table
+        async with db.execute("PRAGMA table_info(jobs)") as cur:
+            job_cols = {row[1] async for row in cur}
+
+        for col, typedef in [
+            ("anon_ip",        "TEXT"),
+            ("download_token", "TEXT"),
+            ("expires_at",     "TEXT"),
+        ]:
+            if col not in job_cols:
+                await db.execute(f"ALTER TABLE jobs ADD COLUMN {col} {typedef}")
+
+        # Create indexes if not exists
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_jobs_token ON jobs(download_token)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_jobs_expires ON jobs(expires_at)")
+
         await db.commit()
