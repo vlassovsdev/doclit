@@ -47,8 +47,6 @@ async def init_db():
 
         CREATE INDEX IF NOT EXISTS idx_jobs_user    ON jobs(user_id);
         CREATE INDEX IF NOT EXISTS idx_jobs_status  ON jobs(status);
-        CREATE INDEX IF NOT EXISTS idx_jobs_token   ON jobs(download_token);
-        CREATE INDEX IF NOT EXISTS idx_jobs_expires ON jobs(expires_at);
         """)
         await db.commit()
 

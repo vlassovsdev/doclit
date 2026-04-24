@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
-import os, httpx
+import os, httpx, secrets
+from urllib.parse import urlencode
 
 from app.database import get_db
 
@@ -14,6 +16,11 @@ ALGO   = "HS256"
 
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+BASE_URL             = os.getenv("BASE_URL", "https://doclit.vlasovs.tk")
+GOOGLE_REDIRECT_URI  = f"{BASE_URL}/api/auth/google/callback"
+
+# Simple in-memory state storage for CSRF protection (OAuth2)
+_oauth_states: dict[str, float] = {}
 
 class RegisterIn(BaseModel):
     email: EmailStr
@@ -58,6 +65,7 @@ async def login(data: LoginIn, db=Depends(get_db)):
         raise HTTPException(401, "Неверный email или пароль")
     return {"token": make_token(user["id"], data.email, user["plan"]), "email": data.email, "plan": user["plan"]}
 
+# ── Google Identity Services popup flow (POST) ──────────────
 @router.post("/google")
 async def google_auth(data: GoogleAuthIn, db=Depends(get_db)):
     """Authenticate with Google ID token (from Google Identity Services)."""
@@ -120,6 +128,128 @@ async def google_auth(data: GoogleAuthIn, db=Depends(get_db)):
         "plan":  "free",
         "avatar": avatar,
     }
+
+
+# ── OAuth2 Authorization Code Flow (redirect-based) ─────────
+
+@router.get("/google/login")
+async def google_login():
+    """Redirect user to Google OAuth2 consent screen."""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(500, "Google OAuth не настроен")
+
+    state = secrets.token_urlsafe(32)
+    _oauth_states[state] = datetime.utcnow().timestamp()
+
+    # Clean up old states (older than 10 min)
+    now = datetime.utcnow().timestamp()
+    expired = [k for k, v in _oauth_states.items() if now - v > 600]
+    for k in expired:
+        _oauth_states.pop(k, None)
+
+    params = urlencode({
+        "client_id":     GOOGLE_CLIENT_ID,
+        "redirect_uri":  GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope":         "openid email profile",
+        "access_type":   "online",
+        "state":         state,
+        "prompt":        "select_account",
+    })
+    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+
+
+@router.get("/google/callback")
+async def google_callback(
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None),
+    db=Depends(get_db),
+):
+    """Handle OAuth2 redirect from Google. Exchange code for tokens, login/register user."""
+    if error:
+        return RedirectResponse(f"/app?auth_error={error}")
+
+    if not code or not state:
+        return RedirectResponse("/app?auth_error=missing_params")
+
+    # Verify state (CSRF protection)
+    if state not in _oauth_states:
+        return RedirectResponse("/app?auth_error=invalid_state")
+    _oauth_states.pop(state, None)
+
+    # Exchange authorization code for tokens
+    try:
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code":          code,
+                    "client_id":     GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "redirect_uri":  GOOGLE_REDIRECT_URI,
+                    "grant_type":    "authorization_code",
+                },
+                timeout=10,
+            )
+            if token_resp.status_code != 200:
+                return RedirectResponse("/app?auth_error=token_exchange_failed")
+            tokens = token_resp.json()
+    except Exception:
+        return RedirectResponse("/app?auth_error=network_error")
+
+    # Verify the ID token from the response
+    id_token = tokens.get("id_token")
+    if not id_token:
+        return RedirectResponse("/app?auth_error=no_id_token")
+
+    google_user = await _verify_google_token(id_token)
+    if not google_user:
+        return RedirectResponse("/app?auth_error=invalid_token")
+
+    email     = google_user["email"]
+    google_id = google_user["sub"]
+    avatar    = google_user.get("picture", "")
+    name      = google_user.get("name", "")
+
+    # Find or create user (same logic as POST /google)
+    async with db.execute(
+        "SELECT id, email, plan FROM users WHERE google_id=?", (google_id,)
+    ) as cur:
+        existing = await cur.fetchone()
+
+    if existing:
+        jwt_token = make_token(existing["id"], existing["email"], existing["plan"])
+        plan = existing["plan"]
+        email = existing["email"]
+    else:
+        async with db.execute(
+            "SELECT id, email, plan FROM users WHERE email=?", (email,)
+        ) as cur:
+            email_user = await cur.fetchone()
+
+        if email_user:
+            await db.execute(
+                "UPDATE users SET google_id=?, avatar_url=? WHERE id=?",
+                (google_id, avatar, email_user["id"])
+            )
+            await db.commit()
+            jwt_token = make_token(email_user["id"], email_user["email"], email_user["plan"])
+            plan = email_user["plan"]
+            email = email_user["email"]
+        else:
+            async with db.execute(
+                "INSERT INTO users (email, google_id, avatar_url) VALUES (?,?,?) RETURNING id",
+                (email, google_id, avatar)
+            ) as cur:
+                row = await cur.fetchone()
+            await db.commit()
+            jwt_token = make_token(row["id"], email)
+            plan = "free"
+
+    # Redirect to /app with auth data in URL fragment (not sent to server)
+    fragment = urlencode({"token": jwt_token, "email": email, "plan": plan, "avatar": avatar})
+    return RedirectResponse(f"/app#{fragment}")
 
 
 async def _verify_google_token(id_token: str) -> dict | None:

@@ -27,8 +27,6 @@ echo ""
 # 1. Системные пакеты
 # ─────────────────────────────────────────
 echo "▶ [1/6] Системные пакеты..."
-sudo su
-whoami
 dnf update -qq
 dnf install -y -qq \
     python3 python3-pip python3-devel \

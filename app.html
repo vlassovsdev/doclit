@@ -358,6 +358,38 @@ function updateAuthUI() {
 }
 updateAuthUI();
 
+// ── Handle OAuth2 redirect callback (URL fragment) ─────────
+(function handleOAuthRedirect() {
+  if (!window.location.hash || window.location.hash.length < 2) return;
+  const params = new URLSearchParams(window.location.hash.substring(1));
+  const t = params.get('token');
+  const e = params.get('email');
+  const p = params.get('plan');
+  const a = params.get('avatar');
+  if (t && e) {
+    saveAuth({token: t, email: e, plan: p || 'free', avatar: a || ''});
+    updateAuthUI();
+    history.replaceState(null, '', window.location.pathname);
+  }
+})();
+
+// ── Handle OAuth2 error ────────────────────────────────────
+(function handleOAuthError() {
+  const params = new URLSearchParams(window.location.search);
+  const err = params.get('auth_error');
+  if (err) {
+    const msgs = {
+      access_denied: 'Вы отменили вход через Google',
+      token_exchange_failed: 'Ошибка обмена токенов с Google',
+      invalid_state: 'Недействительный запрос. Попробуйте ещё раз.',
+      network_error: 'Ошибка сети при авторизации',
+      missing_params: 'Отсутствуют параметры авторизации',
+    };
+    alert(msgs[err] || 'Ошибка авторизации: ' + err);
+    history.replaceState(null, '', window.location.pathname);
+  }
+})();
+
 // ── Auth modal ─────────────────────────────────────────────
 let authMode = 'login';
 function openAuth() { document.getElementById('auth-modal').classList.remove('hidden'); }
@@ -389,12 +421,23 @@ async function submitAuth() {
   } catch(e) { errEl.textContent='Ошибка соединения'; errEl.classList.remove('hidden'); }
 }
 function googleSignIn() {
-  if (!window.google) { alert('Google SDK не загружен. Попробуйте обновить страницу.'); return; }
-  google.accounts.id.initialize({
-    client_id: GOOGLE_CLIENT_ID,
-    callback: handleGoogleResponse,
-  });
-  google.accounts.id.prompt();
+  // Try Google Identity Services popup first
+  if (window.google && window.google.accounts) {
+    try {
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleResponse,
+      });
+      google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          window.location.href = API + '/auth/google/login';
+        }
+      });
+      return;
+    } catch(e) { /* fallback to redirect */ }
+  }
+  // Fallback: redirect-based OAuth2 flow
+  window.location.href = API + '/auth/google/login';
 }
 async function handleGoogleResponse(response) {
   try {
