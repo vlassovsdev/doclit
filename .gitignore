@@ -3,6 +3,11 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+#User's files
+api_backend/outputs/
+api_backend/uploads/
+api_backend/doclit.db
+
 # C extensions
 *.so
 
